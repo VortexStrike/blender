@@ -61,10 +61,10 @@ static void interppixel_NDC(const OIIO::ImageBuf &buf,
                             OIIO::ImageBuf::WrapMode wrapmode)
 {
   const ImageSpec &spec(buf.spec());
-  int fx = spec.full_x;
-  int fy = spec.full_y;
-  int fw = spec.full_width;
-  int fh = spec.full_height;
+  int fx = spec.x;
+  int fy = spec.y;
+  int fw = spec.width;
+  int fh = spec.height;
   x = static_cast<float>(fx) + x * static_cast<float>(fw);
   y = static_cast<float>(fy) + y * static_cast<float>(fh);
 
@@ -124,18 +124,17 @@ static bool resize_block_(OIIO::ImageBuf &dst,
 {
   int x0 = roi.xbegin, x1 = roi.xend, y0 = roi.ybegin, y1 = roi.yend;
   const ImageSpec &srcspec(src.spec());
-  bool src_is_crop = (srcspec.x > srcspec.full_x || srcspec.y > srcspec.full_y ||
-                      srcspec.z > srcspec.full_z ||
-                      srcspec.x + srcspec.width < srcspec.full_x + srcspec.full_width ||
-                      srcspec.y + srcspec.height < srcspec.full_y + srcspec.full_height ||
-                      srcspec.z + srcspec.depth < srcspec.full_z + srcspec.full_depth);
+  bool src_is_crop = (srcspec.x > srcspec.x || srcspec.y > srcspec.y || srcspec.z > srcspec.z ||
+                      srcspec.x + srcspec.width < srcspec.x + srcspec.width ||
+                      srcspec.y + srcspec.height < srcspec.y + srcspec.height ||
+                      srcspec.z + srcspec.depth < srcspec.z + srcspec.depth);
 
   const ImageSpec &dstspec(dst.spec());
   OIIO::span<float> pel = OIIO::OIIO_ALLOCA_SPAN(float, dstspec.nchannels);
-  float xoffset = (float)dstspec.full_x;
-  float yoffset = (float)dstspec.full_y;
-  float xscale = 1.0f / (float)dstspec.full_width;
-  float yscale = 1.0f / (float)dstspec.full_height;
+  float xoffset = (float)dstspec.x;
+  float yoffset = (float)dstspec.y;
+  float xscale = 1.0f / (float)dstspec.width;
+  float yscale = 1.0f / (float)dstspec.height;
   int nchannels = dst.nchannels();
   assert(dst.spec().format == TypeFloat);
   OIIO::ImageBuf::WrapMode wrapmode = src_is_crop ? OIIO::ImageBuf::WrapBlack :

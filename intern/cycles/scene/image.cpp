@@ -630,8 +630,8 @@ void ImageManager::device_load_image_tiled(Scene *scene, const size_t slot)
   int num_tiles = 0;
 
   for (int miplevel = 0; max_miplevels; miplevel++) {
-    const int width = divide_up(img->metadata.width, 1 << miplevel);
-    const int height = divide_up(img->metadata.height, 1 << miplevel);
+    const int width = img->metadata.width >> miplevel;
+    const int height = img->metadata.height >> miplevel;
 
     levels.push_back(num_tiles);
 
@@ -670,8 +670,8 @@ KernelTileDescriptor ImageManager::device_update_tile_requested(Device *device,
                                                                 const size_t x,
                                                                 const size_t y)
 {
-  const int width = divide_up(img->metadata.width, 1 << miplevel);
-  const int height = divide_up(img->metadata.height, 1 << miplevel);
+  const int width = img->metadata.width >> miplevel;
+  const int height = img->metadata.height >> miplevel;
   const size_t tile_size = img->metadata.tile_size;
   const size_t w = min(width - x, tile_size);
   const size_t h = min(height - y, tile_size);
@@ -732,8 +732,8 @@ void ImageManager::device_update_image_requested(Device *device, Scene *scene, I
 
   size_t i = 0;
   for (int miplevel = 0; miplevel < img->tile_descriptor_levels; miplevel++) {
-    const int width = divide_up(img->metadata.width, 1 << miplevel);
-    const int height = divide_up(img->metadata.height, 1 << miplevel);
+    const int width = img->metadata.width >> miplevel;
+    const int height = img->metadata.height >> miplevel;
 
     for (size_t y = 0; y < height; y += tile_size) {
       for (size_t x = 0; x < width; x += tile_size, i++) {
