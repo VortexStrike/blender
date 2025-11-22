@@ -54,7 +54,7 @@ static void generate_texture_cache(Main *bmain,
                                    wmJobWorkerStatus *worker_status = nullptr)
 {
   /* Gather images to generate for. */
-  blender::Vector<const Image *> images;
+  blender::Set<const Image *> images;
 
   FOREACH_NODETREE_BEGIN (bmain, ntree, id) {
     if (ntree->type != NTREE_SHADER) {
@@ -67,7 +67,7 @@ static void generate_texture_cache(Main *bmain,
           ID *image_id = *cb_data->id_pointer;
           if (image_id && GS(image_id->name) == ID_IM) {
             Image *image = blender::id_cast<Image *>(image_id);
-            images.append(image);
+            images.add(image);
           }
           return IDWALK_RET_NOP;
         },
@@ -78,8 +78,12 @@ static void generate_texture_cache(Main *bmain,
 
   /* Gather filepaths to generate for, expanding UDIMs and sequences. */
   blender::Set<std::pair<const Image *, std::string>> filepaths;
+  int total = 0;
 
   for (const Image *image : images) {
+    if (BKE_image_has_packedfile(image)) {
+      continue;
+    }
     if (image->filepath[0] == '\0') {
       continue;
     }
@@ -102,10 +106,11 @@ static void generate_texture_cache(Main *bmain,
           char tile_filepath[FILE_MAX];
           BKE_image_set_filepath_from_tile_number(
               tile_filepath, udim_pattern, tile_format, tile->tile_number);
-          if (BLI_is_file(tile_filepath) &&
-              !CCL_has_texture_cache(image, tile_filepath, U.texture_cachedir))
-          {
-            filepaths.add({image, tile_filepath});
+          if (BLI_is_file(tile_filepath)) {
+            if (!CCL_has_texture_cache(image, tile_filepath, U.texture_cachedir)) {
+              filepaths.add({image, tile_filepath});
+            }
+            total++;
           }
         }
         MEM_freeN(udim_pattern);
@@ -116,8 +121,11 @@ static void generate_texture_cache(Main *bmain,
     /* TODO: handle image sequences. */
 
     /* Handle regular image. */
-    if (BLI_is_file(filepath) && !CCL_has_texture_cache(image, filepath, U.texture_cachedir)) {
-      filepaths.add({image, filepath});
+    if (BLI_is_file(filepath)) {
+      if (!CCL_has_texture_cache(image, filepath, U.texture_cachedir)) {
+        filepaths.add({image, filepath});
+      }
+      total++;
     }
   }
 
@@ -148,11 +156,22 @@ static void generate_texture_cache(Main *bmain,
 
   /* Report stats. */
   if (failed == 0 && completed == 0) {
-    BKE_reportf(reports, RPT_INFO, "All tx files up to date");
+    BKE_reportf(reports, RPT_INFO, "All tx files up to date (%d total)", total);
   }
   else if (failed) {
-    BKE_reportf(
-        reports, RPT_ERROR, "Generated %d tx files, failed %d", completed.load(), failed.load());
+    BKE_reportf(reports,
+                RPT_ERROR,
+                "Generated %d tx files, %d failed, %d up to date",
+                completed.load(),
+                failed.load(),
+                total - completed - failed);
+  }
+  else if (completed < total) {
+    BKE_reportf(reports,
+                RPT_INFO,
+                "Generated %d tx files, %d up to date",
+                completed.load(),
+                total - completed);
   }
   else {
     BKE_reportf(reports, RPT_INFO, "Generated %d tx files", completed.load());
