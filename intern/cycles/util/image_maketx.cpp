@@ -560,35 +560,51 @@ static void clamp_half_tx(OIIO::ImageBuf &buf, const TypeDesc out_format)
 static void convert_srgb_tx(OIIO::ImageBuf &buf, const bool from_srgb)
 {
   assert(buf.spec().format == TypeFloat);
-  assert(buf.spec().nchannels == 4);
+  assert(buf.spec().nchannels == 1 || buf.spec().nchannels == 4);
 
   const int64_t num_pixels = buf.spec().width * buf.spec().height;
-  float4 *pixels = static_cast<float4 *>(buf.localpixels());
-  for (int64_t i = 0; i < num_pixels; i++) {
-    float4 value = pixels[i];
-    const bool has_alpha = !(value.w <= 0.0f || value.w == 1.0f);
 
-    if (has_alpha) {
-      const float inv_alpha = 1.0f / value.w;
-      value.x *= inv_alpha;
-      value.y *= inv_alpha;
-      value.z *= inv_alpha;
-    }
-
+  if (buf.spec().nchannels == 1) {
+    float *pixels = static_cast<float *>(buf.localpixels());
     if (from_srgb) {
-      value = color_srgb_to_linear_v4(pixels[i]);
+      for (int64_t i = 0; i < num_pixels; i++) {
+        pixels[i] = color_srgb_to_linear(pixels[i]);
+      }
     }
     else {
-      value = color_linear_to_srgb_v4(pixels[i]);
+      for (int64_t i = 0; i < num_pixels; i++) {
+        pixels[i] = color_linear_to_srgb(pixels[i]);
+      }
     }
+  }
+  else {
+    float4 *pixels = static_cast<float4 *>(buf.localpixels());
+    for (int64_t i = 0; i < num_pixels; i++) {
+      float4 value = pixels[i];
+      const bool has_alpha = !(value.w <= 0.0f || value.w == 1.0f);
 
-    if (has_alpha) {
-      value.x *= value.w;
-      value.y *= value.w;
-      value.z *= value.w;
+      if (has_alpha) {
+        const float inv_alpha = 1.0f / value.w;
+        value.x *= inv_alpha;
+        value.y *= inv_alpha;
+        value.z *= inv_alpha;
+      }
+
+      if (from_srgb) {
+        value = color_srgb_to_linear_v4(value);
+      }
+      else {
+        value = color_linear_to_srgb_v4(value);
+      }
+
+      if (has_alpha) {
+        value.x *= value.w;
+        value.y *= value.w;
+        value.z *= value.w;
+      }
+
+      pixels[i] = value;
     }
-
-    pixels[i] = value;
   }
 }
 
