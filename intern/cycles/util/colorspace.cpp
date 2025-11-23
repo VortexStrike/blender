@@ -38,6 +38,7 @@ static unordered_map<ustring, ustring> cached_colorspaces;
 static thread_mutex cache_scene_linear_interop_id_mutex;
 static bool cache_scene_linear_interop_id_done = false;
 static const char *cache_scene_linear_interop_id = "";
+static const char *cache_scene_linear_srgb_interop_id = "";
 #endif
 
 static thread_mutex cache_xyz_to_scene_linear_mutex;
@@ -156,6 +157,79 @@ bool ColorSpaceManager::colorspace_is_data(ustring colorspace)
 #else
   return false;
 #endif
+}
+
+const char *ColorSpaceManager::colorspace_interop_id(ustring colorspace)
+{
+  if (colorspace == u_colorspace_auto) {
+    return nullptr;
+  }
+  if (colorspace == u_colorspace_data) {
+    return "data";
+  }
+  if (colorspace == u_colorspace_srgb) {
+    return "srgb_rec709_scene";
+  }
+  if (colorspace == u_colorspace_scene_linear) {
+    const char *interop_id = get_scene_linear_interop_id(false);
+    if (!strcmp(interop_id, "unknown")) {
+      return interop_id;
+    }
+  }
+  else if (colorspace == u_colorspace_scene_linear_srgb) {
+    const char *interop_id = get_scene_linear_interop_id(true);
+    if (!strcmp(interop_id, "unknown")) {
+      return interop_id;
+    }
+  }
+
+#ifdef WITH_OCIO
+  OCIO::ConstConfigRcPtr config = nullptr;
+  try {
+    config = OCIO::GetCurrentConfig();
+    if (!config) {
+      return nullptr;
+    }
+  }
+  catch (const OCIO::Exception &exception) {
+    return nullptr;
+  }
+
+  try {
+    const OCIO::ConstColorSpaceRcPtr space = config->getColorSpace(colorspace.c_str());
+    if (space) {
+      if (space->isData()) {
+        return "data";
+      }
+      /* From https://github.com/AcademySoftwareFoundation/ColorInterop. */
+      /* TODO: Use native interop ID support in OpenColorIO 2.5. */
+      const char *interop_ids[] = {"lin_rec709_scene",
+                                   "lin_p3d65_scene",
+                                   "lin_rec2020_scene",
+                                   "lin_adobergb_scene",
+                                   "lin_ap1_scene",
+                                   "lin_ap0_scene",
+                                   "lin_ciexyzd65_scene",
+                                   "srgb_rec709_scene",
+                                   "g22_rec709_scene",
+                                   "g18_rec709_scene",
+                                   "srgb_ap1_scene",
+                                   "g22_ap1_scene",
+                                   "srgb_p3d65_scene",
+                                   "g22_adobergb_scene"};
+      for (const char *interop_id : interop_ids) {
+        if (space->hasAlias(interop_id)) {
+          return interop_id;
+        }
+      }
+    }
+  }
+  catch (const OCIO::Exception &) {
+    return nullptr;
+  }
+#endif
+
+  return nullptr;
 }
 
 ustring ColorSpaceManager::detect_known_colorspace(ustring colorspace,
@@ -686,9 +760,8 @@ const std::string &ColorSpaceManager::get_xyz_to_scene_linear_rgb_string()
   return cache_xyz_to_scene_linear_hash;
 }
 
-const char *ColorSpaceManager::get_scene_linear_interop_id()
+const char *ColorSpaceManager::get_scene_linear_interop_id(const bool srgb_encoded)
 {
-#ifdef WITH_OCIO
   const thread_scoped_lock cache_lock(cache_scene_linear_interop_id_mutex);
 
   if (!cache_scene_linear_interop_id_done) {
@@ -696,24 +769,25 @@ const char *ColorSpaceManager::get_scene_linear_interop_id()
 
     if (transform_equal_threshold(xyz_to_rgb, get_xyz_to_rec709(), 0.0001f)) {
       cache_scene_linear_interop_id = "lin_rec709_scene";
+      cache_scene_linear_srgb_interop_id = "srgb_rec709_scene";
     }
     else if (transform_equal_threshold(xyz_to_rgb, get_xyz_to_rec2020(), 0.0001f)) {
       cache_scene_linear_interop_id = "lin_rec2020_scene";
+      cache_scene_linear_srgb_interop_id = "srgb_rec2020_scene";
     }
     else if (transform_equal_threshold(xyz_to_rgb, get_xyz_to_acescg(), 0.0001f)) {
       cache_scene_linear_interop_id = "lin_ap1_scene";
+      cache_scene_linear_srgb_interop_id = "srgb_ap1_scene";
     }
     else {
       cache_scene_linear_interop_id = "unknown";
+      cache_scene_linear_srgb_interop_id = "unknown";
     }
 
     cache_scene_linear_interop_id_done = true;
   }
 
-  return cache_scene_linear_interop_id;
-#else
-  return SceneLinearSpace::Rec709
-#endif
+  return (srgb_encoded) ? cache_scene_linear_srgb_interop_id : cache_scene_linear_interop_id;
 }
 
 /* Template instantiations so we don't have to inline functions. */

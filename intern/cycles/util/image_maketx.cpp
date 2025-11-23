@@ -746,6 +746,10 @@ static bool make_tx(const string &filepath,
                                                 u_colorspace_scene_linear;
 
   spec.attribute("oiio:ColorSpace", colorspace);
+  const char *interop_id = ColorSpaceManager::colorspace_interop_id(colorspace);
+  if (interop_id) {
+    spec.attribute("colorInteropID", interop_id);
+  }
   spec.attribute("oiio:UnassociatedAlpha", 0);
 
   /* Source image metadata. */
