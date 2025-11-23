@@ -539,9 +539,10 @@ void ImageMetaData::conform_pixels(void *pixels) const
 }
 
 template<TypeDesc::BASETYPE FileFormat, typename StorageType>
-static bool load_pixels_tx(const ImageMetaData &metadata,
-                           const std::unique_ptr<ImageInput> &in,
-                           StorageType *pixels)
+static bool load_pixels_oiio(const ImageMetaData &metadata,
+                             const std::unique_ptr<ImageInput> &in,
+                             StorageType *pixels,
+                             const bool flip_Y)
 {
   const int64_t width = metadata.width;
   const int64_t height = metadata.height;
@@ -562,9 +563,10 @@ static bool load_pixels_tx(const ImageMetaData &metadata,
                       0,
                       channels,
                       FileFormat,
-                      (uchar *)readpixels + (height - 1) * scanlinesize,
+                      (flip_Y) ? (uchar *)readpixels + (height - 1) * scanlinesize :
+                                 (uchar *)readpixels,
                       AutoStride,
-                      -scanlinesize,
+                      (flip_Y) ? -scanlinesize : scanlinesize,
                       AutoStride))
   {
     return false;
@@ -583,7 +585,7 @@ static bool load_pixels_tx(const ImageMetaData &metadata,
   return true;
 }
 
-bool ImageMetaData::load_pixels(OIIO::string_view filepath, void *pixels) const
+bool ImageMetaData::load_pixels(OIIO::string_view filepath, void *pixels, const bool flip_Y) const
 {
   /* load image from file through OIIO */
   std::unique_ptr<ImageInput> in = ImageInput::create(filepath);
@@ -606,16 +608,16 @@ bool ImageMetaData::load_pixels(OIIO::string_view filepath, void *pixels) const
   switch (type) {
     case IMAGE_DATA_TYPE_BYTE:
     case IMAGE_DATA_TYPE_BYTE4:
-      return load_pixels_tx<TypeDesc::UINT8, uchar>(*this, in, (uchar *)pixels);
+      return load_pixels_oiio<TypeDesc::UINT8, uchar>(*this, in, (uchar *)pixels, flip_Y);
     case IMAGE_DATA_TYPE_USHORT:
     case IMAGE_DATA_TYPE_USHORT4:
-      return load_pixels_tx<TypeDesc::USHORT, uint16_t>(*this, in, (uint16_t *)pixels);
+      return load_pixels_oiio<TypeDesc::USHORT, uint16_t>(*this, in, (uint16_t *)pixels, flip_Y);
     case IMAGE_DATA_TYPE_HALF:
     case IMAGE_DATA_TYPE_HALF4:
-      return load_pixels_tx<TypeDesc::HALF, half>(*this, in, (half *)pixels);
+      return load_pixels_oiio<TypeDesc::HALF, half>(*this, in, (half *)pixels, flip_Y);
     case IMAGE_DATA_TYPE_FLOAT:
     case IMAGE_DATA_TYPE_FLOAT4:
-      return load_pixels_tx<TypeDesc::FLOAT, float>(*this, in, (float *)pixels);
+      return load_pixels_oiio<TypeDesc::FLOAT, float>(*this, in, (float *)pixels, flip_Y);
     case IMAGE_DATA_TYPE_NANOVDB_FLOAT:
     case IMAGE_DATA_TYPE_NANOVDB_FLOAT3:
     case IMAGE_DATA_TYPE_NANOVDB_FLOAT4:

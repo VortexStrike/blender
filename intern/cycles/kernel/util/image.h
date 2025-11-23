@@ -116,8 +116,9 @@ kernel_image_tile_map(KernelGlobals kg,
   const int width = divide_up_by_shift(tex.width, level);
   const int height = divide_up_by_shift(tex.height, level);
 
-  /* Convert coordinates to pixel space. */
-  xy = uv * make_float2(width, height);
+  /* Convert coordinates to pixel space.
+   * Flip Y convention for tiles to match tx files. */
+  xy = make_float2(uv.x * width, (1.0f - uv.y) * height);
 
   /* Tile mapping */
   const int ix = clamp((int)xy.x, 0, width - 1);

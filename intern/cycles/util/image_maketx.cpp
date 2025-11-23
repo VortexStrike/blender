@@ -795,7 +795,7 @@ static bool make_tx(const string &filepath,
   OIIO::ImageBuf buf(spec, OIIO::InitializePixels::No);
   std::time_t in_time = OIIO::Filesystem::last_write_time(filepath);
 
-  if (!metadata.load_pixels(filepath, buf.localpixels())) {
+  if (!metadata.load_pixels(filepath, buf.localpixels(), false)) {
     LOG_WARNING << "Failed to load pixels for " << filepath;
     return false;
   }

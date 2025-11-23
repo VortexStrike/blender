@@ -57,7 +57,7 @@ class ImageMetaData {
   bool is_rgba() const;
   TypeDesc typedesc() const;
 
-  bool load_pixels(OIIO::string_view filepath, void *pixels) const;
+  bool load_pixels(OIIO::string_view filepath, void *pixels, const bool flip_Y = true) const;
   void conform_pixels(void *pixels) const;
   void conform_pixels(void *pixels,
                       const int64_t width,
